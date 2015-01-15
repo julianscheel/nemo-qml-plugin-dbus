@@ -259,7 +259,10 @@ bool DeclarativeDBusAdaptor::handleMessage(const QDBusMessage &message, const QD
                 if (value.userType() == qMetaTypeId<QDBusArgument>())
                     value = DeclarativeDBusInterface::parse(value.value<QDBusArgument>());
 
-                return property.write(this, value);
+                bool ret = property.write(this, value);
+                QDBusMessage reply = message.createReply();
+                connection.call(reply, QDBus::NoBlock);
+                return ret;
             }
         }
         return false;
