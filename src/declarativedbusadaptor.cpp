@@ -242,7 +242,7 @@ bool DeclarativeDBusAdaptor::handleMessage(const QDBusMessage &message, const QD
         } else if (member == QLatin1String("Set")) {
             interface = dbusArguments.value(0).toString();
             member = dbusArguments.value(1).toString();
-            QVariant value = dbusArguments.value(3);
+            QVariant value = qvariant_cast<QDBusVariant>(dbusArguments.value(2)).variant();
 
             const QMetaObject * const meta = metaObject();
             if (!member.isEmpty() && member.at(0).isUpper())
