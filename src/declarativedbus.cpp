@@ -22,6 +22,7 @@
 ** 
 ****************************************************************************************/
 
+#include <QDebug>
 #include "declarativedbus.h"
 
 DeclarativeDBus::DeclarativeDBus(QObject *parent)
@@ -30,13 +31,15 @@ DeclarativeDBus::DeclarativeDBus(QObject *parent)
 
 DeclarativeDBus::~DeclarativeDBus()
 {
+    qDebug() << "Destroy DeclarativeDBus";
+    QDBusConnection::disconnectFromBus("nemo-adaptor");
 }
 
 QDBusConnection DeclarativeDBus::connection(DeclarativeDBus::BusType bus)
 {
     if (bus == SessionBus) {
-        return QDBusConnection::sessionBus();
+        return QDBusConnection::connectToBus(QDBusConnection::SessionBus, "nemo-adaptor");
     } else {
-        return QDBusConnection::systemBus();
+        return QDBusConnection::connectToBus(QDBusConnection::SystemBus, "nemo-adaptor");
     }
 }

@@ -26,8 +26,10 @@
 
 #include <QDBusArgument>
 #include <QDBusMessage>
+#include <QDBusConnectionInterface>
 #include <QDBusConnection>
 #include <QMetaMethod>
+#include <QThread>
 
 #include <qqmlinfo.h>
 #include <QtDebug>
@@ -120,22 +122,48 @@ void DeclarativeDBusAdaptor::classBegin()
 
 void DeclarativeDBusAdaptor::componentComplete()
 {
-    QDBusConnection conn = DeclarativeDBus::connection(m_bus);
+    int retries = 30;
 
-    // Register service name only if it has been set.
-    if (!m_service.isEmpty()) {
-        if (!conn.registerService(m_service)) {
-            qmlInfo(this) << "Failed to register service" << m_service;
-            qmlInfo(this) << conn.lastError().message();
+    while (retries--) {
+        qmlInfo(this) << "Connecting to dbus...";
+        QDBusConnection conn = DeclarativeDBus::connection(m_bus);
+
+        if (!conn.isConnected()) {
+            qmlInfo(this) << "DBUS connection is not ready...";
+            QDBusConnection::disconnectFromBus("nemo-adaptor");
+            QThread::sleep(1);
+            continue;
         }
+
+        // Register service name only if it has been set.
+        if (!m_service.isEmpty()) {
+            QDBusConnectionInterface *intf = conn.interface();
+            QDBusReply<QDBusConnectionInterface::RegisterServiceReply> ret =
+                intf->registerService(m_service, QDBusConnectionInterface::ReplaceExistingService,
+                        QDBusConnectionInterface::AllowReplacement);
+            if (ret != QDBusConnectionInterface::ServiceRegistered) {
+                qmlInfo(this) << "Failed to register service" << m_service <<
+                    ":" << ret;
+                qmlInfo(this) << conn.lastError().message();
+                QThread::sleep(1);
+                continue;
+            }
+        }
+
+        // It is still valid to publish an object on the bus without first registering a service name,
+        // a remote process would have to connect directly to the DBus address.
+        if (!conn.registerVirtualObject(m_path, this)) {
+            qmlInfo(this) << "Failed to register object" << m_path;
+            qmlInfo(this) << conn.lastError().message();
+            QThread::sleep(1);
+            continue;
+        }
+
+        break;
     }
 
-    // It is still valid to publish an object on the bus without first registering a service name,
-    // a remote process would have to connect directly to the DBus address.
-    if (!conn.registerVirtualObject(m_path, this)) {
-        qmlInfo(this) << "Failed to register object" << m_path;
-        qmlInfo(this) << conn.lastError().message();
-    }
+    if (!retries)
+        qmlInfo(this) << "Failed to connecto to dbus";
 }
 
 QString DeclarativeDBusAdaptor::introspect(const QString &) const
